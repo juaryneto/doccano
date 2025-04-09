@@ -19,4 +19,16 @@ export class APIUserRepository {
     const response = await this.request.get(url)
     return response.data.map((item: { [key: string]: any }) => toModel(item))
   }
+
+  async register(userData: any): Promise<UserItem> {
+    const url = '/users/create'
+    const response = await this.request.post(url, userData)
+    return toModel(response.data)
+  }
+
+  async get(userId: number): Promise<UserItem> {
+    const url = `/users/${userId}`
+    const response = await this.request.get(url)
+    return toModel(response.data)
+  }
 }

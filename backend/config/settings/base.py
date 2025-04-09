@@ -10,6 +10,7 @@ https://docs.djangoproject.com/en/2.0/ref/settings/
 Any setting that is configured via an environment variable may
 also be set in a `.env` file in the project base directory.
 """
+import os
 from os import path
 
 import dj_database_url
@@ -71,6 +72,8 @@ INSTALLED_APPS = [
     "health_check.contrib.migrations",
     "health_check.contrib.celery",
     "django_cleanup",
+    "perspectives",
+    "annotations",
 ]
 
 
@@ -83,7 +86,6 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "corsheaders.middleware.CorsMiddleware",
 ]
 
 
@@ -134,22 +136,23 @@ ROLE_PROJECT_ADMIN = env("ROLE_PROJECT_ADMIN", "project_admin")
 ROLE_ANNOTATOR = env("ROLE_ANNOTATOR", "annotator")
 ROLE_ANNOTATION_APPROVER = env("ROLE_ANNOTATION_APPROVER", "annotation_approver")
 
+
 # Password validation
 # https://docs.djangoproject.com/en/2.0/ref/settings/#auth-password-validators
-AUTH_PASSWORD_VALIDATORS = [
-    {
-        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
-    },
-]
+# AUTH_PASSWORD_VALIDATORS = [
+#    {
+#        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
+#    },
+#    {
+#        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+#    },
+#    {
+#        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
+#    },
+#    {
+#        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
+#    },
+# ]
 
 REST_FRAMEWORK = {
     # Use Django's standard `django.contrib.auth` permissions,
@@ -168,7 +171,7 @@ REST_FRAMEWORK = {
     "SEARCH_PARAM": "q",
     "DEFAULT_RENDERER_CLASSES": (
         "rest_framework.renderers.JSONRenderer",
-        "rest_framework.renderers.BrowsableAPIRenderer",
+        # "rest_framework.renderers.BrowsableAPIRenderer",
         "rest_framework_xml.renderers.XMLRenderer",
     ),
 }
@@ -205,8 +208,9 @@ DATABASES["default"].update(
         ssl_require="sslmode" not in furl(env("DATABASE_URL", "")).args,
     )
 )
+if not os.getenv("DATABASE_URL"):
+    os.environ["DATABASE_URL"] = "postgres://doccana_admin:doccana@localhost:5432/doccana_db?sslmode=disable"
 
-# work-around for dj-database-url: explicitly disable ssl for sqlite
 if DATABASES["default"].get("ENGINE") == "django.db.backends.sqlite3":
     DATABASES["default"].get("OPTIONS", {}).pop("sslmode", None)
 
@@ -226,15 +230,28 @@ if DATABASES["default"].get("ENGINE") == "sql_server.pyodbc":
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SESSION_COOKIE_SECURE = env.bool("SESSION_COOKIE_SECURE", False)
 CSRF_COOKIE_SECURE = env.bool("CSRF_COOKIE_SECURE", False)
-CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", [])
+CSRF_TRUSTED_ORIGINS = env.list(
+    "CSRF_TRUSTED_ORIGINS", ["http://localhost:3000", "http://127.0.0.1:3000", "http://0.0.0.0:3000"]
+)
 
 # Allow all host headers
 ALLOWED_HOSTS = ["*"]
 
-if DEBUG:
-    CORS_ORIGIN_ALLOW_ALL = True
-    CSRF_TRUSTED_ORIGINS = ["http://127.0.0.1:3000", "http://0.0.0.0:3000", "http://localhost:3000"]
-    CSRF_TRUSTED_ORIGINS += env.list("CSRF_TRUSTED_ORIGINS", [])
+CORS_ORIGIN_ALLOW_ALL = True
+CSRF_TRUSTED_ORIGINS = [
+    "http://127.0.0.1:3000",
+    "http://0.0.0.0:3000",
+    "http://localhost:3000",
+    "http://127.0.0.1:000",
+    "http://192.168.101.18:3000",
+    "http://10.20.92.150:3000",
+    "http://10.20.88.144:3000",
+    "http://10.20.85.44:3000",
+    "http://10.20.81.58:3000",
+    "http://172.24.64.1:3000",
+    "http://10.20.80.25:3000",
+]
+CSRF_TRUSTED_ORIGINS += env.list("CSRF_TRUSTED_ORIGINS", [])
 
 # Batch size for importing data
 IMPORT_BATCH_SIZE = env.int("IMPORT_BATCH_SIZE", 1000)
@@ -264,9 +281,9 @@ ENABLE_FILE_TYPE_CHECK = env.bool("ENABLE_FILE_TYPE_CHECK", False)
 
 # Celery settings
 DJANGO_CELERY_RESULTS_TASK_ID_MAX_LENGTH = 191
-CELERY_RESULT_BACKEND = "django-db"
+CELERY_RESULT_BACKEND = "redis://localhost:6379/0"
 try:
-    CELERY_BROKER_URL = env("CELERY_BROKER_URL")
+    CELERY_BROKER_URL = 'redis://localhost:6379/0'
 except EnvError:
     try:
         # quickfix for Heroku.
@@ -277,6 +294,8 @@ except EnvError:
         CELERY_BROKER_URL = "sqla+{}".format(uri)
     except EnvError:
         CELERY_BROKER_URL = "sqla+sqlite:///{}".format(DATABASES["default"]["NAME"])
+
+ACCOUNT_ADAPTER = "users.adapters.CustomAccountAdapter"
 CELERY_ACCEPT_CONTENT = ["application/json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
